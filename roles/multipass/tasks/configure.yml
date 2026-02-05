@@ -1,0 +1,49 @@
+---
+- name: Configure Multipass service
+  win_service:
+    name: "{{ multipass_service_name }}"
+    start_mode: "{{ multipass_service_start_mode }}"
+    state: "{{ 'started' if multipass_ensure_service_running else 'stopped' }}"
+  register: service_config
+
+- name: Wait for service to start
+  win_shell: |
+    $timeout = {{ multipass_service_startup_delay }}
+    Start-Sleep -Seconds $timeout
+    $service = Get-Service -Name "{{ multipass_service_name }}"
+    Write-Output $service.Status
+  when: service_config.changed and multipass_ensure_service_running
+  changed_when: false
+  register: service_status
+
+- name: Set Multipass driver
+  win_shell: |
+    $env:PATH += ";{{ multipass_bin_dir }}"
+    & "{{ multipass_binary_path }}" set local.driver={{ multipass_driver }}
+  when: install_result.changed
+  register: driver_set
+  failed_when: false
+
+- name: Display driver configuration result
+  debug:
+    msg: "{{ driver_set.stdout_lines }}"
+  when: driver_set is defined and driver_set.stdout_lines is defined
+
+- name: Configure network bridge (Hyper-V)
+  win_shell: |
+    $env:PATH += ";{{ multipass_bin_dir }}"
+    & "{{ multipass_binary_path }}" set local.bridged-network="{{ multipass_network_bridge }}"
+  when:
+    - multipass_driver == "hyperv"
+    - multipass_network_bridge | length > 0
+    - install_result.changed
+  register: network_set
+  failed_when: false
+
+- name: Set default instance specs
+  win_shell: |
+    $env:PATH += ";{{ multipass_bin_dir }}"
+    & "{{ multipass_binary_path }}" set client.primary-name=primary
+  when: install_result.changed
+  register: defaults_set
+  failed_when: false

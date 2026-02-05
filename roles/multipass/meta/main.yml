@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: multipass
+  author: Gil
+  description: Install and manage Canonical Multipass on Windows
+
+  license: MIT
+
+  min_ansible_version: "2.9"
+
+  platforms:
+    - name: Windows
+      versions:
+        - 10
+        - 11
+        - 2019
+        - 2022
+
+  galaxy_tags:
+    - windows
+    - virtualization
+    - multipass
+    - ubuntu
+
+dependencies: []

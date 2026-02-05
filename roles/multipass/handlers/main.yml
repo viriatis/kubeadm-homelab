@@ -1,0 +1,6 @@
+---
+- name: Restart multipass service
+  win_service:
+    name: "{{ multipass_service_name }}"
+    state: restarted
+  listen: restart multipass service

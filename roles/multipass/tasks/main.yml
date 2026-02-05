@@ -1,0 +1,32 @@
+---
+- name: Include preflight checks
+  include_tasks: preflight.yml
+  tags:
+    - multipass
+    - preflight
+
+- name: Include installation tasks
+  include_tasks: install.yml
+  tags:
+    - multipass
+    - install
+
+- name: Include configuration tasks
+  include_tasks: configure.yml
+  tags:
+    - multipass
+    - configure
+
+- name: Include validation tasks
+  include_tasks: validate.yml
+  when: multipass_verify_installation
+  tags:
+    - multipass
+    - validate
+
+- name: Include cleanup tasks
+  include_tasks: cleanup.yml
+  when: multipass_cleanup_installer
+  tags:
+    - multipass
+    - cleanup

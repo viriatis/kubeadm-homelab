@@ -1,0 +1,11 @@
+---
+- name: Install Multipass on Windows
+  hosts: windows
+  gather_facts: yes
+  
+  roles:
+    - role: multipass
+      vars:
+        multipass_version: "1.16.1"
+        multipass_driver: "hyperv"
+        multipass_allow_upgrade: false

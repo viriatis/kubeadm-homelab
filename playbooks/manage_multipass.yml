@@ -1,0 +1,36 @@
+---
+- name: Manage Multipass configuration
+  hosts: windows
+  gather_facts: no
+  
+  tasks:
+    - name: List Multipass instances
+      win_command: multipass list
+      register: instances
+      changed_when: false
+    
+    - name: Display instances
+      debug:
+        msg: "{{ instances.stdout_lines }}"
+    
+    - name: Launch Ubuntu instance
+      win_command: >
+        multipass launch
+        --name dev-instance
+        --cpus 2
+        --memory 2G
+        --disk 10G
+        focal
+      register: launch_result
+      failed_when: false
+    
+    - name: Check instance status
+      win_command: multipass info dev-instance
+      register: instance_info
+      changed_when: false
+      failed_when: false
+    
+    - name: Display instance info
+      debug:
+        msg: "{{ instance_info.stdout_lines }}"
+      when: instance_info.rc == 0

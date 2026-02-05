@@ -1,0 +1,24 @@
+---
+# Internal variables (do not override)
+multipass_installer_filename: "multipass-{{ multipass_version }}-installer.exe"
+multipass_installer_path: "{{ multipass_temp_dir }}\\{{ multipass_installer_filename }}"
+multipass_binary_path: "{{ multipass_install_path }}\\bin\\multipass.exe"
+multipass_bin_dir: "{{ multipass_install_path }}\\bin"
+
+# Registry paths for checking installation
+multipass_registry_paths:
+  - "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*"
+  - "HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*"
+
+# Required Windows features
+multipass_required_features:
+  hyperv:
+    - "Microsoft-Hyper-V"
+    - "Microsoft-Hyper-V-Management-PowerShell"
+  virtualbox: []
+
+# Minimum system requirements
+multipass_min_requirements:
+  windows_version: 10
+  ram_gb: 4
+  disk_free_gb: 10

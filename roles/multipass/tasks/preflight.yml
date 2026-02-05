@@ -1,0 +1,141 @@
+---
+- name: Check if running on Windows
+  assert:
+    that:
+      - ansible_facts["os_family"] == "Windows"
+    fail_msg: "This role only supports Windows systems"
+    success_msg: "Running on Windows {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+
+- name: Check Windows version compatibility
+  assert:
+    that:
+      - ansible_facts['distribution_major_version'] | int >= multipass_min_requirements.windows_version
+    fail_msg: "Multipass requires Windows {{ multipass_min_requirements.windows_version }} or later"
+    success_msg: "Windows version is compatible"
+
+- name: Gather system information
+  win_shell: |
+    $ram = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 2)
+    $disk = [math]::Round((Get-PSDrive C).Free / 1GB, 2)
+    Write-Output "RAM:$ram"
+    Write-Output "DISK:$disk"
+  register: system_info
+  changed_when: false
+
+- name: Parse system information
+  set_fact:
+    system_ram_gb: "{{ system_info.stdout_lines | select('match', '^RAM:') | first | regex_replace('^RAM:', '') | float }}"
+    system_disk_free_gb: "{{ system_info.stdout_lines | select('match', '^DISK:') | first | regex_replace('^DISK:', '') | float }}"
+
+- name: Check system requirements
+  assert:
+    that:
+      - system_ram_gb | float >= multipass_min_requirements.ram_gb
+      - system_disk_free_gb | float >= multipass_min_requirements.disk_free_gb
+    fail_msg: |
+      System does not meet minimum requirements:
+      - RAM: {{ system_ram_gb }}GB (required: {{ multipass_min_requirements.ram_gb }}GB)
+      - Free Disk: {{ system_disk_free_gb }}GB (required: {{ multipass_min_requirements.disk_free_gb }}GB)
+    success_msg: "System meets minimum requirements"
+
+- name: Check if Hyper-V is available and enabled
+  win_shell: |
+    $feature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -ErrorAction SilentlyContinue
+    if ($feature) {
+      Write-Output $feature.State
+    } else {
+      Write-Output "NotAvailable"
+    }
+  register: hyperv_status
+  changed_when: false
+  when: 
+    - multipass_driver == "hyperv"
+    - multipass_check_hypervisor
+
+- name: Display Hyper-V status
+  debug:
+    msg: "Hyper-V status: {{ hyperv_status.stdout_lines[0] }}"
+  when: 
+    - multipass_driver == "hyperv"
+    - hyperv_status is defined
+
+- name: Warn if Hyper-V is not enabled
+  debug:
+    msg: "WARNING: Hyper-V is {{ hyperv_status.stdout_lines[0] }}. Multipass may not work correctly."
+  when:
+    - multipass_driver == "hyperv"
+    - hyperv_status is defined
+    - hyperv_status.stdout_lines[0] != "Enabled"
+
+- name: Check for VirtualBox if selected
+  win_shell: |
+    $vbox = Get-ItemProperty HKLM:\Software\Oracle\VirtualBox -ErrorAction SilentlyContinue
+    if ($vbox) {
+      Write-Output "Installed"
+    } else {
+      Write-Output "NotInstalled"
+    }
+  register: virtualbox_status
+  changed_when: false
+  when: 
+    - multipass_driver == "virtualbox"
+    - multipass_check_hypervisor
+
+- name: Fail if VirtualBox not found
+  fail:
+    msg: "VirtualBox is not installed but is required for the selected driver"
+  when:
+    - multipass_driver == "virtualbox"
+    - virtualbox_status is defined
+    - virtualbox_status.stdout_lines[0] == "NotInstalled"
+
+- name: Check current Multipass installation
+  win_shell: |
+    try {
+      $multipassPath = "{{ multipass_binary_path }}"
+      if (Test-Path $multipassPath) {
+        $version = & $multipassPath version 2>&1 | Select-String "multipass\s+(\d+\.\d+\.\d+)" | 
+                   ForEach-Object { $_.Matches.Groups[1].Value }
+        if ($version) {
+          Write-Output $version
+        } else {
+          Write-Output "unknown"
+        }
+      } else {
+        Write-Output "not_installed"
+      }
+    } catch {
+      Write-Output "not_installed"
+    }
+  register: current_multipass_version
+  changed_when: false
+  failed_when: false
+
+- name: Set installation facts
+  set_fact:
+    multipass_is_installed: "{{ current_multipass_version.stdout_lines[0] != 'not_installed' }}"
+    multipass_current_version: "{{ current_multipass_version.stdout_lines[0] }}"
+    multipass_needs_install: "{{ current_multipass_version.stdout_lines[0] == 'not_installed' }}"
+    multipass_needs_upgrade: "{{ current_multipass_version.stdout_lines[0] != 'not_installed' and current_multipass_version.stdout_lines[0] != multipass_version }}"
+
+- name: Display current installation status
+  debug:
+    msg: |
+      Multipass installation status:
+      - Installed: {{ multipass_is_installed }}
+      - Current version: {{ multipass_current_version }}
+      - Target version: {{ multipass_version }}
+      - Needs install: {{ multipass_needs_install }}
+      - Needs upgrade: {{ multipass_needs_upgrade }}
+      - Allow upgrade: {{ multipass_allow_upgrade }}
+
+- name: Prevent upgrade if not allowed
+  fail:
+    msg: |
+      Multipass {{ multipass_current_version }} is already installed.
+      Target version is {{ multipass_version }}.
+      Set multipass_allow_upgrade: true to upgrade.
+  when:
+    - multipass_needs_upgrade
+    - not multipass_allow_upgrade
+    - not multipass_force_reinstall

@@ -1,0 +1,107 @@
+---
+- name: Create temp directory
+  win_file:
+    path: "{{ multipass_temp_dir }}"
+    state: directory
+
+- name: Download Multipass installer
+  win_get_url:
+    url: "{{ multipass_download_url }}"
+    dest: "{{ multipass_installer_path }}"
+    timeout: "{{ multipass_download_timeout }}"
+    force: no
+  register: download_result
+  when: multipass_needs_install or (multipass_needs_upgrade and multipass_allow_upgrade) or multipass_force_reinstall
+
+- name: Stop Multipass service before upgrade
+  win_service:
+    name: "{{ multipass_service_name }}"
+    state: stopped
+  when:
+    - multipass_needs_upgrade
+    - multipass_allow_upgrade
+    - multipass_is_installed
+  register: service_stopped
+  failed_when: false
+
+- name: Wait for service to stop
+  win_shell: |
+    $timeout = 30
+    $elapsed = 0
+    while ($elapsed -lt $timeout) {
+      $service = Get-Service -Name "{{ multipass_service_name }}" -ErrorAction SilentlyContinue
+      if ($service.Status -eq 'Stopped' -or $service.Status -eq 'StopPending') {
+        Start-Sleep -Seconds 2
+        if ($service.Status -eq 'Stopped') {
+          Write-Output "Stopped"
+          exit 0
+        }
+      }
+      Start-Sleep -Seconds 2
+      $elapsed += 2
+    }
+    Write-Output "Timeout"
+  register: service_stop_wait
+  when: service_stopped.changed
+  changed_when: false
+
+- name: Install Multipass
+  win_package:
+    path: "{{ multipass_installer_path }}"
+    product_id: "Multipass"
+    arguments: "{{ multipass_install_args }}"
+    state: present
+    creates_path: "{{ multipass_binary_path }}"
+  register: install_result
+  when: download_result.changed or multipass_force_reinstall
+  notify:
+    - restart multipass service
+
+- name: Wait for installation to complete
+  win_shell: |
+    $timeout = {{ multipass_install_timeout }}
+    $elapsed = 0
+    while ($elapsed -lt $timeout) {
+      $process = Get-Process -Name "multipass-installer" -ErrorAction SilentlyContinue
+      if (-not $process) {
+        # Wait a bit more to ensure installation is fully complete
+        Start-Sleep -Seconds 5
+        break
+      }
+      Start-Sleep -Seconds 5
+      $elapsed += 5
+    }
+    if ($elapsed -ge $timeout) {
+      Write-Output "Installation timeout"
+      exit 1
+    }
+    Write-Output "Installation complete"
+  when: install_result.changed
+  changed_when: false
+
+- name: Wait for Multipass service to be registered
+  win_shell: |
+    $timeout = {{ multipass_service_wait_timeout }}
+    $elapsed = 0
+    while ($elapsed -lt $timeout) {
+      $service = Get-Service -Name "{{ multipass_service_name }}" -ErrorAction SilentlyContinue
+      if ($service) {
+        Write-Output "Service registered"
+        exit 0
+      }
+      Start-Sleep -Seconds 2
+      $elapsed += 2
+    }
+    Write-Output "Service not registered"
+    exit 1
+  register: service_wait
+  changed_when: false
+  when: install_result.changed
+
+- name: Add Multipass to system PATH
+  win_path:
+    elements:
+      - "{{ multipass_bin_dir }}"
+    state: present
+    scope: machine
+  when: multipass_add_to_path

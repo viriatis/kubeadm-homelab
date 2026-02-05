@@ -1,0 +1,58 @@
+---
+# Multipass version to install
+multipass_version: "1.16.1"
+
+# Download URL pattern
+multipass_base_url: "https://github.com/canonical/multipass/releases/download"
+multipass_download_url: "{{ multipass_base_url }}/v{{ multipass_version }}/multipass-{{ multipass_version }}+win-win64.exe"
+
+# Temporary directory for downloads
+multipass_temp_dir: "C:\\Temp\\ansible"
+
+# Installation options
+multipass_install_args: "/S"  # Silent install
+multipass_install_path: "C:\\Program Files\\Multipass"
+
+# Cleanup after installation
+multipass_cleanup_installer: true
+multipass_cleanup_temp_dir: false
+
+# Service configuration
+multipass_service_name: "Multipass"
+multipass_service_display_name: "Multipass"
+multipass_service_start_mode: "auto"
+multipass_ensure_service_running: true
+multipass_service_startup_delay: 10  # seconds
+
+# Hypervisor backend (hyperv or virtualbox)
+multipass_driver: "hyperv"
+
+# Network configuration
+multipass_network_bridge: ""  # Empty is default
+
+# Multipass daemon settings
+multipass_driver_settings:
+  hyperv:
+    network: "Default Switch"
+  virtualbox:
+    network: "vboxnet0"
+
+# Instance defaults
+multipass_default_cpus: 2
+multipass_default_memory: "2G"
+multipass_default_disk: "10G"
+
+# Feature flags
+multipass_check_hypervisor: true
+multipass_add_to_path: true
+multipass_verify_installation: true
+multipass_run_validation_tests: true
+
+# Timeouts (in seconds)
+multipass_download_timeout: 600
+multipass_install_timeout: 300
+multipass_service_wait_timeout: 60
+
+# Upgrade behavior
+multipass_allow_upgrade: false
+multipass_force_reinstall: false

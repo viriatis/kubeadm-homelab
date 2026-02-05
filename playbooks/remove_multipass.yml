@@ -1,0 +1,47 @@
+---
+- name: Remove Multipass from Windows
+  hosts: windows
+  gather_facts: yes
+  
+  tasks:
+    - name: Stop all instances
+      win_shell: |
+        $instances = & multipass list --format json | ConvertFrom-Json
+        foreach ($instance in $instances.list) {
+          Write-Output "Stopping $($instance.name)"
+          & multipass stop $instance.name
+        }
+      failed_when: false
+    
+    - name: Delete all instances
+      win_shell: |
+        $instances = & multipass list --format json | ConvertFrom-Json
+        foreach ($instance in $instances.list) {
+          Write-Output "Deleting $($instance.name)"
+          & multipass delete $instance.name
+        }
+        & multipass purge
+      failed_when: false
+    
+    - name: Stop Multipass service
+      win_service:
+        name: Multipass
+        state: stopped
+      failed_when: false
+    
+    - name: Uninstall Multipass
+      win_package:
+        product_id: Multipass
+        state: absent
+    
+    - name: Remove Multipass from PATH
+      win_path:
+        elements:
+          - "C:\\Program Files\\Multipass\\bin"
+        state: absent
+        scope: machine
+    
+    - name: Clean up remaining files
+      win_file:
+        path: "C:\\Program Files\\Multipass"
+        state: absent

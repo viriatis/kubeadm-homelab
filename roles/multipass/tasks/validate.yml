@@ -1,0 +1,94 @@
+---
+- name: Verify Multipass binary exists
+  win_stat:
+    path: "{{ multipass_binary_path }}"
+  register: binary_stat
+  failed_when: not binary_stat.stat.exists
+
+- name: Get Multipass version
+  win_shell: |
+    $env:PATH += ";{{ multipass_bin_dir }}"
+    & "{{ multipass_binary_path }}" version
+  register: verify_version
+  changed_when: false
+
+- name: Parse installed version
+  set_fact:
+    installed_version: "{{ verify_version.stdout | regex_search('multipass\\s+(\\d+\\.\\d+\\.\\d+)', '\\1') | first }}"
+
+- name: Verify correct version installed
+  assert:
+    that:
+      - installed_version == multipass_version
+    fail_msg: "Expected version {{ multipass_version }}, but found {{ installed_version }}"
+    success_msg: "Multipass {{ installed_version }} successfully installed"
+
+- name: Display version information
+  debug:
+    msg: "{{ verify_version.stdout_lines }}"
+
+- name: Check Multipass service status
+  win_shell: |
+    $service = Get-Service -Name "{{ multipass_service_name }}" -ErrorAction SilentlyContinue
+    if ($service) {
+      Write-Output "exists:$($service.Status)"
+    } else {
+      Write-Output "exists:NotFound"
+    }
+  register: multipass_service_check
+  changed_when: false
+
+- name: Parse service status
+  set_fact:
+    service_exists: "{{ multipass_service_check.stdout_lines[0].split(':')[1] != 'NotFound' }}"
+    service_state: "{{ multipass_service_check.stdout_lines[0].split(':')[1] }}"
+
+- name: Verify service is running
+  assert:
+    that:
+      - service_exists | bool
+      - service_state == 'Running'
+    fail_msg: "Multipass service is {{ service_state }}"
+    success_msg: "Multipass service is running"
+  when: multipass_ensure_service_running
+
+- name: Run validation tests
+  block:
+    - name: Test multipass list command
+      win_shell: |
+        $env:PATH += ";{{ multipass_bin_dir }}"
+        & "{{ multipass_binary_path }}" list
+      register: multipass_list
+      changed_when: false
+
+    - name: Display current instances
+      debug:
+        msg: "{{ multipass_list.stdout_lines }}"
+
+    - name: Test multipass networks command
+      win_shell: |
+        $env:PATH += ";{{ multipass_bin_dir }}"
+        & "{{ multipass_binary_path }}" networks
+      register: multipass_networks
+      changed_when: false
+      failed_when: false
+
+    - name: Display available networks
+      debug:
+        msg: "{{ multipass_networks.stdout_lines }}"
+      when: multipass_networks.rc == 0
+
+    - name: Get multipass settings
+      win_shell: |
+        $env:PATH += ";{{ multipass_bin_dir }}"
+        & "{{ multipass_binary_path }}" get local.driver
+      register: multipass_driver_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display driver configuration
+      debug:
+        msg: "Configured driver: {{ multipass_driver_check.stdout_lines[0] }}"
+      when: multipass_driver_check.rc == 0
+
+  when: multipass_run_validation_tests

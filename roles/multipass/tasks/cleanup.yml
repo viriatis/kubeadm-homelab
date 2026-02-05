@@ -1,0 +1,14 @@
+---
+- name: Remove installer file
+  win_file:
+    path: "{{ multipass_installer_path }}"
+    state: absent
+  when: install_result.changed or download_result.changed
+
+- name: Remove temp directory
+  win_file:
+    path: "{{ multipass_temp_dir }}"
+    state: absent
+  when:
+    - multipass_cleanup_temp_dir
+    - install_result.changed
