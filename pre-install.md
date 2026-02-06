@@ -228,7 +228,7 @@ Auth
 
 PS C:\Users\ansible> Test-WSMan -ComputerName localhost -Port 5986 -UseSSL
 Test-WSMan : <f:WSManFault xmlns:f="http://schemas.microsoft.com/wbem/wsman/1/wsmanfault" Code="12175"
-Machine="viriatis-desk"><f:Message>The server certificate on the destination computer (localhost:5986) has the
+Machine="viriatis-desktop"><f:Message>The server certificate on the destination computer (localhost:5986) has the
 following errors:
 The SSL certificate is signed by an unknown certificate authority.
 The SSL certificate contains a common name (CN) that does not match the hostname.     </f:Message></f:WSManFault>
@@ -293,7 +293,7 @@ ansible True
 PS C:\Users\ansible> Get-LocalGroupMember -Group "Administrators" | Where-Object {$_.Name -like "*ansible*"}
 ObjectClass Name                  PrincipalSource
 ----------- ----                  ---------------
-User        viriatis-desk\ansible Local
+User        viriatis-desktop\ansible Local
 
 PS C:\Users\ansible> Get-LocalGroupMember -Group "Remote Management Users" | Where-Object {$_.Name -like "*ansible*"}
 PS C:\Users\ansible>
