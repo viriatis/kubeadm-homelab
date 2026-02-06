@@ -139,7 +139,7 @@ I created a host.ini for test:
 #### On my mac
 ```ini
 [windows]
-192.168.200.35
+192.168.1.10
 
 [windows:vars]
 ansible_connection: winrm
